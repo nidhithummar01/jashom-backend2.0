@@ -2,6 +2,8 @@ import express from 'express'
 import cors from 'cors'
 import { pool } from './db.js'
 import blogRoutes from './routes/blogs.js'
+import authRoutes from './routes/auth.js'
+import { requireAuth } from './middleware/auth.js'
 import { env } from './config.js'
 
 const app = express()
@@ -24,7 +26,8 @@ app.get('/health', async (_, res) => {
   }
 })
 
-app.use('/v1/admin/blogs', blogRoutes)
+app.use('/v1/admin/auth', authRoutes)
+app.use('/v1/admin/blogs', requireAuth, blogRoutes)
 
 app.listen(env.port, () => {
   console.log(`Jashom backend running on http://localhost:${env.port}`)
