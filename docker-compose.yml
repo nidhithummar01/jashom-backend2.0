@@ -1,0 +1,12 @@
+services:
+  api:
+    image: docker.jashom.com/jashom-backend:${TAG}
+    container_name: jashom-backend
+
+    ports:
+      - "5000:5000"
+
+    env_file:
+      - .env
+
+    restart: unless-stopped
