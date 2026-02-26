@@ -1,0 +1,139 @@
+{
+  "info": {
+    "name": "Jashom Backend API",
+    "description": "Health check and Blog CRUD APIs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "blogId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "description": "Check if server and database are up."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Blogs",
+      "item": [
+        {
+          "name": "Get all blogs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/admin/blogs",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "admin", "blogs"]
+            },
+            "description": "Fetch all blogs. Optional query: status, slug, limit, offset."
+          }
+        },
+        {
+          "name": "Get all blogs (with query)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/admin/blogs?status=published&limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "admin", "blogs"],
+              "query": [
+                { "key": "status", "value": "published" },
+                { "key": "limit", "value": "10" },
+                { "key": "offset", "value": "0" }
+              ]
+            },
+            "description": "Fetch blogs with filters."
+          }
+        },
+        {
+          "name": "Get blog by slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/admin/blogs?slug=my-first-post",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "admin", "blogs"],
+              "query": [
+                { "key": "slug", "value": "my-first-post" }
+              ]
+            },
+            "description": "Fetch blog by slug. Returns array (0 or 1 item)."
+          }
+        },
+        {
+          "name": "Get blog by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/admin/blogs/{{blogId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "admin", "blogs", "{{blogId}}"]
+            },
+            "description": "Fetch a single blog by id."
+          }
+        },
+        {
+          "name": "Create blog",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"My first post\",\n  \"slug\": \"my-first-post\",\n  \"content\": \"Hello world content here.\",\n  \"excerpt\": \"Short summary\",\n  \"author_name\": \"Admin\",\n  \"status\": \"draft\",\n  \"is_featured\": false,\n  \"allow_comments\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/admin/blogs",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "admin", "blogs"]
+            },
+            "description": "Create a new blog. Required: title, slug, content."
+          }
+        },
+        {
+          "name": "Update blog",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated title\",\n  \"status\": \"published\",\n  \"published_at\": \"2025-02-25T12:00:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/admin/blogs/{{blogId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "admin", "blogs", "{{blogId}}"]
+            },
+            "description": "Update a blog by id. Send only fields to update."
+          }
+        },
+        {
+          "name": "Delete blog",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/admin/blogs/{{blogId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "admin", "blogs", "{{blogId}}"]
+            },
+            "description": "Delete a blog by id."
+          }
+        }
+      ]
+    }
+  ]
+}
