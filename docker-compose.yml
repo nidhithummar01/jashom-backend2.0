@@ -1,10 +1,11 @@
 services:
   api:
-    image: docker.jashom.com/jashom-backend:${TAG}
+    build: .
+    image: docker.jashom.com/jashom-backend:${TAG:-latest}
     container_name: jashom-backend
 
     ports:
-      - "5000:5000"
+      - "2131:5000"
 
     env_file:
       - .env
