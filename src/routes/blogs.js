@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { pool } from '../db.js'
+import { requireAuth } from '../middleware/auth.js'
 
 const router = Router()
 
@@ -93,8 +94,8 @@ router.post('/', async (req, res) => {
   }
 })
 
-/** PUT /blogs/:id — update blog */
-router.put('/:id', async (req, res) => {
+/** PUT /blogs/:id — update blog (auth required) */
+router.put('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params
     const body = req.body || {}
@@ -126,8 +127,8 @@ router.put('/:id', async (req, res) => {
   }
 })
 
-/** DELETE /blogs/:id — delete blog */
-router.delete('/:id', async (req, res) => {
+/** DELETE /blogs/:id — delete blog (auth required) */
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params
     const { rowCount } = await pool.query('DELETE FROM blogs WHERE id = $1', [id])
