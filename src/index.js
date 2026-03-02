@@ -13,7 +13,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }))
-app.use(express.json())
+app.use(express.json({ limit: '50mb' }))
 
 /** API root — so requests to base URL get JSON, not HTML (helps verify backend is hit in production) */
 app.get('/', (_, res) => res.json({ api: 'v1', docs: { blogs: 'GET /v1/admin/blogs', health: 'GET /health' } }))
