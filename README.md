@@ -32,7 +32,13 @@ npm install
 npm run dev
 ```
 
-Server runs at `http://localhost:5000`. `GET /health` returns `{ "ok": true, "message": "your health is healthy" }`.
+Server runs at `http://localhost:5000`. `GET /health` returns `{ "ok": true }`.
+
+## 4. Live deployment (e.g. https://backend.jashom.com)
+
+- **Base URL**: In the **frontend** build env set `VITE_API_URL=https://backend.jashom.com` (no trailing slash).
+- **CORS**: On the backend server set `CORS_ORIGIN` to your live frontend origin (e.g. `https://jashom.com`) if needed. If unset, the server reflects the request origin.
+- **Verify**: Open `https://backend.jashom.com/` or `https://backend.jashom.com/health` — you should see JSON. If you see HTML, the request is not reaching this Node app (check reverse proxy or hosting).
 
 ---
 

@@ -15,6 +15,10 @@ app.use(cors({
 }))
 app.use(express.json())
 
+/** API root — so requests to base URL get JSON, not HTML (helps verify backend is hit in production) */
+app.get('/', (_, res) => res.json({ api: 'v1', docs: { blogs: 'GET /v1/admin/blogs', health: 'GET /health' } }))
+app.get('/v1', (_, res) => res.json({ admin: { blogs: '/v1/admin/blogs', auth: '/v1/admin/auth' } }))
+
 /** Health check — GET /health */
 app.get('/health', async (_, res) => {
   try {
