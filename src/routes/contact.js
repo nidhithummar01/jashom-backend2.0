@@ -59,7 +59,8 @@ router.post('/', async (req, res) => {
       auth: { user, pass },
     })
 
-    const subject = `New contact form: ${fullName}${company ? ` (${company})` : ''}`
+    const companySuffix = company ? ` (${company})` : ''
+    const subject = `New contact form: ${fullName}${companySuffix}`
     const text = [
       `Name: ${fullName}`,
       `Email: ${email}`,
