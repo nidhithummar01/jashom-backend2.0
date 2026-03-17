@@ -1,0 +1,106 @@
+import { Router } from 'express'
+import nodemailer from 'nodemailer'
+
+const router = Router()
+
+function isValidEmail(email) {
+  if (typeof email !== 'string') return false
+  const e = email.trim()
+  if (e.length < 5 || e.length > 254) return false
+  // basic sanity check; avoid over-strict regexes
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
+}
+
+function cleanText(v, maxLen) {
+  if (v == null) return ''
+  const s = String(v).trim()
+  if (s.length > maxLen) return s.slice(0, maxLen)
+  return s
+}
+
+function mustEnv(name) {
+  const v = process.env[name]
+  if (!v || !String(v).trim()) throw new Error(`Missing ${name} in environment`)
+  return String(v).trim()
+}
+
+function optionalEnv(name, fallback) {
+  const v = process.env[name]
+  return (v && String(v).trim()) ? String(v).trim() : fallback
+}
+
+router.post('/', async (req, res) => {
+  try {
+    const body = req.body || {}
+    const fullName = cleanText(body.fullName, 120)
+    const email = cleanText(body.email, 254)
+    const phone = cleanText(body.phone, 40)
+    const company = cleanText(body.company, 160)
+    const message = cleanText(body.message, 5000)
+
+    if (!fullName) return res.status(400).json({ error: 'Name is required' })
+    if (!email || !isValidEmail(email)) return res.status(400).json({ error: 'Valid email is required' })
+    if (!message) return res.status(400).json({ error: 'Message is required' })
+
+    const host = mustEnv('SMTP_HOST')
+    const port = Number(mustEnv('SMTP_PORT'))
+    const user = mustEnv('SMTP_USER')
+    const pass = mustEnv('SMTP_PASS')
+    // Default recipient for contact form submissions
+    const to = optionalEnv('CONTACT_TO_EMAIL', 'nidhi.thummar@jashom.com')
+    const from = (process.env.CONTACT_FROM_EMAIL && String(process.env.CONTACT_FROM_EMAIL).trim())
+      ? String(process.env.CONTACT_FROM_EMAIL).trim()
+      : user
+
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass },
+    })
+
+    const subject = `New contact form: ${fullName}${company ? ` (${company})` : ''}`
+    const text = [
+      `Name: ${fullName}`,
+      `Email: ${email}`,
+      phone ? `Phone: ${phone}` : null,
+      company ? `Company: ${company}` : null,
+      '',
+      'Message:',
+      message,
+      '',
+      `Sent from: ${req.get('origin') || req.get('referer') || 'unknown'}`,
+      `IP: ${req.ip}`,
+      `UA: ${req.get('user-agent') || 'unknown'}`,
+    ].filter(Boolean).join('\n')
+
+    const html = `
+      <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;line-height:1.5;color:#111">
+        <h2 style="margin:0 0 12px">New contact form submission</h2>
+        <p style="margin:0 0 6px"><b>Name:</b> ${fullName.replace(/</g, '&lt;')}</p>
+        <p style="margin:0 0 6px"><b>Email:</b> ${email.replace(/</g, '&lt;')}</p>
+        ${phone ? `<p style="margin:0 0 6px"><b>Phone:</b> ${phone.replace(/</g, '&lt;')}</p>` : ''}
+        ${company ? `<p style="margin:0 0 6px"><b>Company:</b> ${company.replace(/</g, '&lt;')}</p>` : ''}
+        <p style="margin:16px 0 6px"><b>Message:</b></p>
+        <pre style="margin:0;padding:12px;background:#f6f7f8;border-radius:8px;white-space:pre-wrap">${message.replace(/</g, '&lt;')}</pre>
+      </div>
+    `.trim()
+
+    await transporter.sendMail({
+      from,
+      to,
+      subject,
+      text,
+      html,
+      replyTo: email,
+    })
+
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('POST /v1/contact', err)
+    res.status(500).json({ error: err.message || 'Failed to send message' })
+  }
+})
+
+export default router
+
