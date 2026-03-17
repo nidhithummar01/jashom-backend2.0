@@ -86,7 +86,7 @@ router.post('/', async (req, res) => {
       </div>
     `.trim()
 
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from,
       to,
       subject,
@@ -95,7 +95,16 @@ router.post('/', async (req, res) => {
       replyTo: email,
     })
 
-    res.json({ ok: true })
+    // Helpful delivery debugging (SendGrid accepts/rejects are visible here)
+    console.log('contact mail sent', {
+      messageId: info?.messageId,
+      accepted: info?.accepted,
+      rejected: info?.rejected,
+      response: info?.response,
+    })
+
+    const debug = String(process.env.CONTACT_DEBUG || '').trim().toLowerCase() === 'true'
+    res.json(debug ? { ok: true, messageId: info?.messageId, accepted: info?.accepted, rejected: info?.rejected } : { ok: true })
   } catch (err) {
     console.error('POST /v1/contact', err)
     res.status(500).json({ error: err.message || 'Failed to send message' })
