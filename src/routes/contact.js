@@ -131,7 +131,12 @@ router.post('/', async (req, res) => {
     }
 
     // Always return messageId/accepted so production issues are observable.
-    res.json({ ok: true, messageId: info?.messageId, queuedId, accepted, rejected })
+    // If CONTACT_DEBUG=true, also return the SMTP provider response for tracing.
+    const debug = String(process.env.CONTACT_DEBUG || '').trim().toLowerCase() === 'true'
+    res.json(debug
+      ? { ok: true, messageId: info?.messageId, queuedId, accepted, rejected, response: providerResponse }
+      : { ok: true, messageId: info?.messageId, queuedId, accepted, rejected }
+    )
   } catch (err) {
     console.error('POST /v1/contact', err)
     res.status(500).json({ error: err.message || 'Failed to send message' })
