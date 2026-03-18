@@ -120,9 +120,13 @@ router.post('/', async (req, res) => {
     if (rejected.length > 0) {
       return res.status(502).json({ error: 'Email provider rejected the message', rejected })
     }
+    const accepted = Array.isArray(info?.accepted) ? info.accepted : []
+    if (accepted.length === 0) {
+      return res.status(502).json({ error: 'Email provider did not accept the message' })
+    }
 
-    const debug = String(process.env.CONTACT_DEBUG || '').trim().toLowerCase() === 'true'
-    res.json(debug ? { ok: true, messageId: info?.messageId, accepted: info?.accepted, rejected: info?.rejected } : { ok: true })
+    // Always return messageId/accepted so production issues are observable.
+    res.json({ ok: true, messageId: info?.messageId, accepted, rejected })
   } catch (err) {
     console.error('POST /v1/contact', err)
     res.status(500).json({ error: err.message || 'Failed to send message' })
