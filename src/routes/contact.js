@@ -110,8 +110,9 @@ router.post('/', async (req, res) => {
 
     // Helpful delivery debugging (SendGrid accepts/rejects are visible here)
     const providerResponse = String(info?.response || '')
-    const queuedIdMatch = providerResponse.match(/queued as\\s+<?([^>\\s]+)>?/i)
-    const queuedId = queuedIdMatch ? queuedIdMatch[1] : null
+    const queuedAsRe = /queued as\\s+<?([^>\\s]+)>?/i
+    const queuedIdExec = queuedAsRe.exec(providerResponse)
+    const queuedId = queuedIdExec ? queuedIdExec[1] : null
     console.log('contact mail sent', {
       messageId: info?.messageId,
       accepted: info?.accepted,
