@@ -58,9 +58,10 @@ router.post('/', async (req, res) => {
     const pass = mustEnv('SMTP_PASS')
     // Default recipient for contact form submissions
     const to = optionalEnv('CONTACT_TO_EMAIL', 'nidhi.thummar@jashom.com')
-    const from = (process.env.CONTACT_FROM_EMAIL && String(process.env.CONTACT_FROM_EMAIL).trim())
-      ? String(process.env.CONTACT_FROM_EMAIL).trim()
-      : user
+    // SendGrid SMTP commonly uses SMTP_USER="apikey" (not a valid email address).
+    // Always use a real/verified sender email so delivery works reliably in production.
+    const configuredFrom = optionalEnv('CONTACT_FROM_EMAIL', '')
+    const from = isValidEmail(configuredFrom) ? configuredFrom : to
 
     console.log('contact form: sending to', to, 'from', email, 'name', fullName)
     const transporter = nodemailer.createTransport({
@@ -114,6 +115,11 @@ router.post('/', async (req, res) => {
       rejected: info?.rejected,
       response: info?.response,
     })
+
+    const rejected = Array.isArray(info?.rejected) ? info.rejected : []
+    if (rejected.length > 0) {
+      return res.status(502).json({ error: 'Email provider rejected the message', rejected })
+    }
 
     const debug = String(process.env.CONTACT_DEBUG || '').trim().toLowerCase() === 'true'
     res.json(debug ? { ok: true, messageId: info?.messageId, accepted: info?.accepted, rejected: info?.rejected } : { ok: true })
