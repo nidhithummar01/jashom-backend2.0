@@ -8,20 +8,17 @@ function isValidEmail(email) {
   const e = email.trim()
   if (e.length < 5 || e.length > 254) return false
   // basic sanity check (linear time; avoids regex backtracking)
-  // Requirements:
-  // - exactly one "@"
-  // - no spaces
-  // - at least one "." after "@"
-  // - non-empty local and domain parts
-  if (e.includes(' ')) return false
   const at = e.indexOf('@')
-  if (at <= 0) return false
-  if (e.indexOf('@', at + 1) !== -1) return false // more than one "@"
   const domain = e.slice(at + 1)
-  if (!domain) return false
   const dot = domain.indexOf('.')
-  if (dot <= 0 || dot === domain.length - 1) return false
-  return true
+  return (
+    !e.includes(' ') &&
+    at > 0 &&
+    e.indexOf('@', at + 1) === -1 &&
+    domain.length > 0 &&
+    dot > 0 &&
+    dot < domain.length - 1
+  )
 }
 
 function cleanText(v, maxLen) {
