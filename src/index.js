@@ -10,9 +10,16 @@ const app = express()
 
 // Allow frontend (www.jashom.com, localhost) and admin to call the API
 const corsOrigin = process.env.CORS_ORIGIN
-const corsOriginOption = corsOrigin
-  ? (corsOrigin.includes(',') ? corsOrigin.split(',').map((o) => o.trim()) : corsOrigin.trim())
-  : true // true = reflect request origin so any frontend origin works
+/** @type {boolean | string | string[]} */
+let corsOriginOption
+if (!corsOrigin) {
+  // Reflect request origin so any frontend origin works
+  corsOriginOption = true
+} else if (corsOrigin.includes(',')) {
+  corsOriginOption = corsOrigin.split(',').map((o) => o.trim())
+} else {
+  corsOriginOption = corsOrigin.trim()
+}
 app.use(cors({
   origin: corsOriginOption,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
