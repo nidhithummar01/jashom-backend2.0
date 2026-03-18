@@ -109,11 +109,15 @@ router.post('/', async (req, res) => {
     })
 
     // Helpful delivery debugging (SendGrid accepts/rejects are visible here)
+    const providerResponse = String(info?.response || '')
+    const queuedIdMatch = providerResponse.match(/queued as\\s+<?([^>\\s]+)>?/i)
+    const queuedId = queuedIdMatch ? queuedIdMatch[1] : null
     console.log('contact mail sent', {
       messageId: info?.messageId,
       accepted: info?.accepted,
       rejected: info?.rejected,
-      response: info?.response,
+      response: providerResponse,
+      queuedId,
     })
 
     const rejected = Array.isArray(info?.rejected) ? info.rejected : []
@@ -126,7 +130,7 @@ router.post('/', async (req, res) => {
     }
 
     // Always return messageId/accepted so production issues are observable.
-    res.json({ ok: true, messageId: info?.messageId, accepted, rejected })
+    res.json({ ok: true, messageId: info?.messageId, queuedId, accepted, rejected })
   } catch (err) {
     console.error('POST /v1/contact', err)
     res.status(500).json({ error: err.message || 'Failed to send message' })
