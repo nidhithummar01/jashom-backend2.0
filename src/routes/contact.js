@@ -62,6 +62,7 @@ router.post('/', async (req, res) => {
       ? String(process.env.CONTACT_FROM_EMAIL).trim()
       : user
 
+    console.log('contact form: sending to', to, 'from', email, 'name', fullName)
     const transporter = nodemailer.createTransport({
       host,
       port,

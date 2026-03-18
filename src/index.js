@@ -8,9 +8,13 @@ import { env } from './config.js'
 
 const app = express()
 
-// Allow admin panel (and other origins in dev) to call the API
+// Allow frontend (www.jashom.com, localhost) and admin to call the API
+const corsOrigin = process.env.CORS_ORIGIN
+const corsOriginOption = corsOrigin
+  ? (corsOrigin.includes(',') ? corsOrigin.split(',').map((o) => o.trim()) : corsOrigin.trim())
+  : true // true = reflect request origin so any frontend origin works
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || true, // true = reflect request origin; or set e.g. http://localhost:5173
+  origin: corsOriginOption,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }))
