@@ -56,10 +56,10 @@ router.post('/', async (req, res) => {
     const port = Number(mustEnv('SMTP_PORT'))
     const user = mustEnv('SMTP_USER')
     const pass = mustEnv('SMTP_PASS')
-    // Default recipient for contact form submissions
-    const to = optionalEnv('CONTACT_TO_EMAIL', 'nidhi.thummar@jashom.com')
-    // SendGrid SMTP commonly uses SMTP_USER="apikey" (not a valid email address).
-    // Always use a real/verified sender email so delivery works reliably in production.
+    // Inbox for all contact form submissions (production: set CONTACT_TO_EMAIL in env).
+    const to = optionalEnv('CONTACT_TO_EMAIL', 'info@jashom.com')
+    // SendGrid SMTP commonly uses SMTP_USER="apikey" (literal string, not an email).
+    // CONTACT_FROM_EMAIL must be a verified Sender in SendGrid (often same as CONTACT_TO_EMAIL).
     const configuredFrom = optionalEnv('CONTACT_FROM_EMAIL', '')
     const from = isValidEmail(configuredFrom) ? configuredFrom : to
 
@@ -110,7 +110,7 @@ router.post('/', async (req, res) => {
 
     // Helpful delivery debugging (SendGrid accepts/rejects are visible here)
     const providerResponse = String(info?.response || '')
-    const queuedAsRe = /queued as\\s+<?([^>\\s]+)>?/i
+    const queuedAsRe = /queued as\s+<?([^>\s]+)>?/i
     const queuedIdExec = queuedAsRe.exec(providerResponse)
     const queuedId = queuedIdExec ? queuedIdExec[1] : null
     console.log('contact mail sent', {

@@ -10,10 +10,23 @@ Copy the example env and add your Supabase values:
 cp .env.example .env
 ```
 
-Edit `.env`:
+Edit `.env` (see `.env.example`):
 
 - **DATABASE_URL** — Postgres connection string (Supabase: Dashboard → Project Settings → Database → Connection string URI)
-- **PORT** — Server port (default `3000`)
+- **PORT** — Server port (default `5000` in this repo)
+
+### Contact form email (SendGrid)
+
+All frontend contact forms POST to `POST /v1/contact` and the server sends mail via **SMTP** (nodemailer).
+
+- **SMTP_HOST** — e.g. `smtp.sendgrid.net`
+- **SMTP_PORT** — usually `587` (TLS) or `465` (SSL)
+- **SMTP_USER** — for SendGrid this is always the literal string `apikey`
+- **SMTP_PASS** — your **SendGrid API key** (not the same as “new API key” wording in the UI—you create one key and paste it here)
+- **CONTACT_TO_EMAIL** — company inbox that receives every submission (default in code: `info@jashom.com`). Set this in production `.env` to be sure.
+- **CONTACT_FROM_EMAIL** — must be a **verified sender** in SendGrid (recommended: `info@jashom.com` if that address is verified). If unset, the server uses `CONTACT_TO_EMAIL` as the From address.
+
+If mail works in one environment but not on the live site, the live server usually has missing `SMTP_*` env vars, an unverified From domain, or SendGrid blocking the message (check SendGrid Activity).
 
 ## 2. Run migrations
 
