@@ -40,6 +40,14 @@ function optionalEnv(name, fallback) {
   return (v && String(v).trim()) ? String(v).trim() : fallback
 }
 
+/** Comma- or semicolon-separated list → valid emails only (e.g. CONTACT_TO_EMAIL=a@x.com,b@y.com). */
+function parseContactToEmails(raw, fallback) {
+  const s = (raw && String(raw).trim()) ? String(raw).trim() : fallback
+  const parts = s.split(/[,;]+/).map((p) => p.trim()).filter(Boolean)
+  const valid = parts.filter(isValidEmail)
+  return valid.length > 0 ? valid : [fallback]
+}
+
 /** @returns false if response was sent with 400 */
 function validateContactInput(res, fullName, email, message) {
   if (!fullName) {
@@ -146,11 +154,12 @@ router.post('/', async (req, res) => {
     const port = Number(mustEnv('SMTP_PORT'))
     const user = mustEnv('SMTP_USER')
     const pass = mustEnv('SMTP_PASS')
-    const to = optionalEnv('CONTACT_TO_EMAIL', 'info@jashom.com')
+    const toDefault = 'info@jashom.com'
+    const toList = parseContactToEmails(optionalEnv('CONTACT_TO_EMAIL', toDefault), toDefault)
     const configuredFrom = optionalEnv('CONTACT_FROM_EMAIL', '')
-    const from = isValidEmail(configuredFrom) ? configuredFrom : to
+    const from = isValidEmail(configuredFrom) ? configuredFrom : toList[0]
 
-    console.log('contact form: sending to', to, 'from', fields.email, 'name', fields.fullName)
+    console.log('contact form: sending to', toList.join(', '), 'from', fields.email, 'name', fields.fullName)
     const transporter = nodemailer.createTransport({
       host,
       port,
@@ -162,7 +171,7 @@ router.post('/', async (req, res) => {
 
     const info = await transporter.sendMail({
       from,
-      to,
+      to: toList,
       subject,
       text,
       html,
