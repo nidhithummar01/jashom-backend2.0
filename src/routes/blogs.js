@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { pool } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { queryPaginatedList } from '../utils/pagination.js'
+import { findById, deleteById, buildInsertColumns, buildUpdateAssignments } from '../utils/crud.js'
 
 const router = Router()
 
@@ -42,15 +43,9 @@ router.get('/', async (req, res) => {
 /** GET /blogs/:id — fetch blog by id */
 router.get('/:id', async (req, res) => {
   try {
-    const { id } = req.params
-    const { rows, rowCount } = await pool.query(
-      'SELECT * FROM blogs WHERE id = $1',
-      [id]
-    )
-    if (rowCount === 0) {
-      return res.status(404).json({ error: 'Blog not found' })
-    }
-    res.json(rows[0])
+    const blog = await findById('blogs', req.params.id)
+    if (!blog) return res.status(404).json({ error: 'Blog not found' })
+    res.json(blog)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -60,26 +55,15 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const body = req.body || {}
-    const cols = []
-    const vals = []
-    let paramIndex = 1
-    for (const col of BLOG_COLUMNS) {
-      if (body[col] !== undefined) {
-        cols.push(col)
-        vals.push(valueForDb(col, body[col]))
-        paramIndex++
-      }
-    }
-    if (cols.length === 0) {
-      return res.status(400).json({ error: 'Provide at least title, slug, content' })
-    }
     if (!body.title || !body.slug || body.content === undefined) {
       return res.status(400).json({ error: 'title, slug, and content are required' })
     }
-    const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ')
-    const columns = cols.join(', ')
+    const { cols, vals, placeholders } = buildInsertColumns(BLOG_COLUMNS, body, valueForDb)
+    if (cols.length === 0) {
+      return res.status(400).json({ error: 'Provide at least title, slug, content' })
+    }
     const { rows } = await pool.query(
-      `INSERT INTO blogs (${columns}) VALUES (${placeholders}) RETURNING *`,
+      `INSERT INTO blogs (${cols.join(', ')}) VALUES (${placeholders}) RETURNING *`,
       vals
     )
     res.status(201).json(rows[0])
@@ -91,24 +75,14 @@ router.post('/', async (req, res) => {
 /** PUT /blogs/:id — update blog (auth required) */
 router.put('/:id', requireAuth, async (req, res) => {
   try {
-    const { id } = req.params
     const body = req.body || {}
-    const updates = []
-    const vals = []
-    let paramIndex = 1
-    for (const col of BLOG_COLUMNS) {
-      if (body[col] !== undefined) {
-        updates.push(`${col} = $${paramIndex++}`)
-        vals.push(valueForDb(col, body[col]))
-      }
-    }
-    if (updates.length === 0) {
+    const { assignments, vals, nextParam } = buildUpdateAssignments(BLOG_COLUMNS, body, valueForDb)
+    if (assignments.length === 0) {
       return res.status(400).json({ error: 'No fields to update' })
     }
-    vals.push(id)
-    const whereParam = paramIndex
+    vals.push(req.params.id)
     const { rows, rowCount } = await pool.query(
-      `UPDATE blogs SET ${updates.join(', ')} WHERE id = $${whereParam} RETURNING *`,
+      `UPDATE blogs SET ${assignments.join(', ')} WHERE id = $${nextParam} RETURNING *`,
       vals
     )
     if (rowCount === 0) {
@@ -124,9 +98,8 @@ router.put('/:id', requireAuth, async (req, res) => {
 /** DELETE /blogs/:id — delete blog (auth required) */
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
-    const { id } = req.params
-    const { rowCount } = await pool.query('DELETE FROM blogs WHERE id = $1', [id])
-    if (rowCount === 0) {
+    const deleted = await deleteById('blogs', req.params.id)
+    if (!deleted) {
       return res.status(404).json({ error: 'Blog not found' })
     }
     res.status(204).send()

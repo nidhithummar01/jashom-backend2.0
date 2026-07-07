@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { pool } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { queryPaginatedList } from '../utils/pagination.js'
+import { findById, deleteById, buildInsertColumns, buildUpdateAssignments } from '../utils/crud.js'
 
 const router = Router()
 
@@ -30,9 +31,9 @@ router.get('/', async (req, res) => {
 /** GET /v1/admin/jobs/:id */
 router.get('/:id', async (req, res) => {
   try {
-    const { rows, rowCount } = await pool.query('SELECT * FROM jobs WHERE id = $1', [req.params.id])
-    if (rowCount === 0) return res.status(404).json({ error: 'Job not found' })
-    res.json(rows[0])
+    const job = await findById('jobs', req.params.id)
+    if (!job) return res.status(404).json({ error: 'Job not found' })
+    res.json(job)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -43,11 +44,7 @@ router.post('/', requireAuth, async (req, res) => {
   try {
     const body = req.body || {}
     if (!body.title || !body.slug) return res.status(400).json({ error: 'title and slug are required' })
-    const cols = [], vals = []
-    for (const col of JOB_COLUMNS) {
-      if (body[col] !== undefined) { cols.push(col); vals.push(body[col]) }
-    }
-    const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ')
+    const { cols, vals, placeholders } = buildInsertColumns(JOB_COLUMNS, body)
     const { rows } = await pool.query(
       `INSERT INTO jobs (${cols.join(', ')}) VALUES (${placeholders}) RETURNING *`,
       vals
@@ -62,15 +59,11 @@ router.post('/', requireAuth, async (req, res) => {
 router.put('/:id', requireAuth, async (req, res) => {
   try {
     const body = req.body || {}
-    const updates = [], vals = []
-    let p = 1
-    for (const col of JOB_COLUMNS) {
-      if (body[col] !== undefined) { updates.push(`${col} = $${p++}`); vals.push(body[col]) }
-    }
-    if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' })
+    const { assignments, vals, nextParam } = buildUpdateAssignments(JOB_COLUMNS, body)
+    if (assignments.length === 0) return res.status(400).json({ error: 'No fields to update' })
     vals.push(req.params.id)
     const { rows, rowCount } = await pool.query(
-      `UPDATE jobs SET ${updates.join(', ')} WHERE id = $${p} RETURNING *`,
+      `UPDATE jobs SET ${assignments.join(', ')} WHERE id = $${nextParam} RETURNING *`,
       vals
     )
     if (rowCount === 0) return res.status(404).json({ error: 'Job not found' })
@@ -83,8 +76,8 @@ router.put('/:id', requireAuth, async (req, res) => {
 /** DELETE /v1/admin/jobs/:id (auth required) */
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
-    const { rowCount } = await pool.query('DELETE FROM jobs WHERE id = $1', [req.params.id])
-    if (rowCount === 0) return res.status(404).json({ error: 'Job not found' })
+    const deleted = await deleteById('jobs', req.params.id)
+    if (!deleted) return res.status(404).json({ error: 'Job not found' })
     res.status(204).send()
   } catch (err) {
     res.status(500).json({ error: err.message })

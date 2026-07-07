@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer'
 import { pool } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { queryPaginatedList } from '../utils/pagination.js'
+import { deleteById } from '../utils/crud.js'
 
 const router = Router()
 
@@ -173,8 +174,8 @@ router.put('/:id', requireAuth, async (req, res) => {
 /** DELETE /v1/applications/:id (admin only) */
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
-    const { rowCount } = await pool.query('DELETE FROM job_applications WHERE id = $1', [req.params.id])
-    if (rowCount === 0) return res.status(404).json({ error: 'Application not found' })
+    const deleted = await deleteById('job_applications', req.params.id)
+    if (!deleted) return res.status(404).json({ error: 'Application not found' })
     res.status(204).send()
   } catch (err) {
     res.status(500).json({ error: err.message })
