@@ -4,24 +4,9 @@ import { pool } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { queryPaginatedList } from '../utils/pagination.js'
 import { deleteById } from '../utils/crud.js'
+import { cleanText, isValidEmail, escapeLt } from '../utils/text.js'
 
 const router = Router()
-
-function cleanText(v, max) {
-  if (v == null) return ''
-  const s = String(v).trim()
-  return s.length > max ? s.slice(0, max) : s
-}
-
-function isValidEmail(email) {
-  if (typeof email !== 'string') return false
-  const e = email.trim()
-  const at = e.indexOf('@')
-  const domain = e.slice(at + 1)
-  return at > 0 && domain.indexOf('.') > 0 && !e.includes(' ')
-}
-
-function escapeLt(s) { return String(s).replace(/</g, '&lt;') }
 
 function parseApplicationInput(body) {
   return {

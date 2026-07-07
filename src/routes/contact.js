@@ -1,33 +1,10 @@
 import { Router } from 'express'
 import nodemailer from 'nodemailer'
+import { cleanText, isValidEmail, escapeLt } from '../utils/text.js'
 
 const router = Router()
 
 const SENDGRID_QUEUED_RE = /queued as\s+<?([^>\s]+)>?/i
-
-function isValidEmail(email) {
-  if (typeof email !== 'string') return false
-  const e = email.trim()
-  if (e.length < 5 || e.length > 254) return false
-  const at = e.indexOf('@')
-  const domain = e.slice(at + 1)
-  const dot = domain.indexOf('.')
-  return (
-    !e.includes(' ') &&
-    at > 0 &&
-    e.indexOf('@', at + 1) === -1 &&
-    domain.length > 0 &&
-    dot > 0 &&
-    dot < domain.length - 1
-  )
-}
-
-function cleanText(v, maxLen) {
-  if (v == null) return ''
-  const s = String(v).trim()
-  if (s.length > maxLen) return s.slice(0, maxLen)
-  return s
-}
 
 function mustEnv(name) {
   const v = process.env[name]
@@ -63,10 +40,6 @@ function validateContactInput(res, fullName, email, message) {
     return false
   }
   return true
-}
-
-function escapeLt(s) {
-  return String(s).replace(/</g, '&lt;')
 }
 
 function buildContactMessageBody(fields, req) {
