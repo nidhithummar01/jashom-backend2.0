@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { pool } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
+import { queryPaginatedList } from '../utils/pagination.js'
 
 const router = Router()
 
@@ -13,15 +14,13 @@ const JOB_COLUMNS = [
 /** GET /v1/admin/jobs — list jobs (?status=published&limit=50&offset=0) */
 router.get('/', async (req, res) => {
   try {
-    const { status, limit = 50, offset = 0 } = req.query
-    let query = 'SELECT * FROM jobs WHERE 1=1'
-    const params = []
-    let i = 1
-    if (status) { query += ` AND status = $${i++}`; params.push(status) }
-    query += ' ORDER BY sort_order ASC, posted_at DESC NULLS LAST, created_at DESC'
-    query += ` LIMIT $${i} OFFSET $${i + 1}`
-    params.push(Math.min(Number(limit) || 50, 200), Number(offset) || 0)
-    const { rows } = await pool.query(query, params)
+    const { status, limit, offset } = req.query
+    const { rows } = await queryPaginatedList({
+      baseQuery: 'SELECT * FROM jobs WHERE 1=1',
+      filters: [['status', status]],
+      orderBy: 'ORDER BY sort_order ASC, posted_at DESC NULLS LAST, created_at DESC',
+      limit, offset, defaultLimit: 50, maxLimit: 200,
+    })
     res.json(rows)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -45,12 +44,12 @@ router.post('/', requireAuth, async (req, res) => {
     const body = req.body || {}
     if (!body.title || !body.slug) return res.status(400).json({ error: 'title and slug are required' })
     const cols = [], vals = []
-    let p = 1
     for (const col of JOB_COLUMNS) {
-      if (body[col] !== undefined) { cols.push(col); vals.push(body[col]); p++ }
+      if (body[col] !== undefined) { cols.push(col); vals.push(body[col]) }
     }
+    const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ')
     const { rows } = await pool.query(
-      `INSERT INTO jobs (${cols.join(', ')}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')}) RETURNING *`,
+      `INSERT INTO jobs (${cols.join(', ')}) VALUES (${placeholders}) RETURNING *`,
       vals
     )
     res.status(201).json(rows[0])

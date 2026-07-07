@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { pool } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
+import { queryPaginatedList } from '../utils/pagination.js'
 
 const router = Router()
 
@@ -25,22 +26,13 @@ function valueForDb(col, val) {
 /** GET /blogs — fetch all blogs (optional: ?status=published&slug=my-post&limit=20&offset=0) */
 router.get('/', async (req, res) => {
   try {
-    const { status, slug, limit = 50, offset = 0 } = req.query
-    let query = 'SELECT * FROM blogs WHERE 1=1'
-    const params = []
-    let i = 1
-    if (status) {
-      query += ` AND status = $${i++}`
-      params.push(status)
-    }
-    if (slug) {
-      query += ` AND slug = $${i++}`
-      params.push(slug)
-    }
-    query += ' ORDER BY sort_order ASC, published_at DESC NULLS LAST, created_at DESC'
-    query += ` LIMIT $${i} OFFSET $${i + 1}`
-    params.push(Math.min(Number(limit) || 50, 100), Number(offset) || 0)
-    const { rows } = await pool.query(query, params)
+    const { status, slug, limit, offset } = req.query
+    const { rows } = await queryPaginatedList({
+      baseQuery: 'SELECT * FROM blogs WHERE 1=1',
+      filters: [['status', status], ['slug', slug]],
+      orderBy: 'ORDER BY sort_order ASC, published_at DESC NULLS LAST, created_at DESC',
+      limit, offset, defaultLimit: 50, maxLimit: 100,
+    })
     res.json(rows)
   } catch (err) {
     res.status(500).json({ error: err.message })

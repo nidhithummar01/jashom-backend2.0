@@ -2,6 +2,7 @@ import { Router } from 'express'
 import nodemailer from 'nodemailer'
 import { pool } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
+import { queryPaginatedList } from '../utils/pagination.js'
 
 const router = Router()
 
@@ -21,38 +22,97 @@ function isValidEmail(email) {
 
 function escapeLt(s) { return String(s).replace(/</g, '&lt;') }
 
+function parseApplicationInput(body) {
+  return {
+    fullName: cleanText(body.fullName, 120),
+    email: cleanText(body.email, 254),
+    phone: cleanText(body.phone, 40),
+    coverLetter: cleanText(body.coverLetter, 5000),
+    linkedinUrl: cleanText(body.linkedinUrl, 500),
+    portfolioUrl: cleanText(body.portfolioUrl, 500),
+    jobId: body.jobId ? Number(body.jobId) : null,
+    jobTitle: cleanText(body.jobTitle, 255),
+  }
+}
+
+function validateApplicationInput({ fullName, email }) {
+  if (!fullName) return 'Full name is required'
+  if (!email || !isValidEmail(email)) return 'Valid email is required'
+  return null
+}
+
+async function jobExists(jobId) {
+  if (!jobId) return true
+  const { rowCount } = await pool.query('SELECT id FROM jobs WHERE id = $1', [jobId])
+  return rowCount > 0
+}
+
+async function insertApplication(fields) {
+  const { jobId, jobTitle, fullName, email, phone, coverLetter, linkedinUrl, portfolioUrl } = fields
+  const { rows } = await pool.query(
+    `INSERT INTO job_applications
+       (job_id, job_title, full_name, email, phone, cover_letter, linkedin_url, portfolio_url)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+    [jobId, jobTitle || null, fullName, email, phone || null, coverLetter || null, linkedinUrl || null, portfolioUrl || null]
+  )
+  return rows[0]
+}
+
+function buildApplicationEmailHtml({ jobTitle, fullName, email, phone, linkedinUrl, portfolioUrl, coverLetter }) {
+  const positionRow = jobTitle ? `<p style="margin:0 0 6px"><b>Position:</b> ${escapeLt(jobTitle)}</p>` : ''
+  const phoneRow = phone ? `<p style="margin:0 0 6px"><b>Phone:</b> ${escapeLt(phone)}</p>` : ''
+  const linkedinRow = linkedinUrl ? `<p style="margin:0 0 6px"><b>LinkedIn:</b> ${escapeLt(linkedinUrl)}</p>` : ''
+  const portfolioRow = portfolioUrl ? `<p style="margin:0 0 6px"><b>Portfolio:</b> ${escapeLt(portfolioUrl)}</p>` : ''
+  const coverRow = coverLetter
+    ? `<p style="margin:16px 0 6px"><b>Cover Letter:</b></p>
+       <pre style="margin:0;padding:12px;background:#f6f7f8;white-space:pre-wrap">${escapeLt(coverLetter)}</pre>`
+    : ''
+
+  return `
+    <div style="font-family:system-ui,sans-serif;line-height:1.5;color:#111">
+      <h2 style="margin:0 0 16px">New Job Application</h2>
+      ${positionRow}
+      <p style="margin:0 0 6px"><b>Name:</b> ${escapeLt(fullName)}</p>
+      <p style="margin:0 0 6px"><b>Email:</b> ${escapeLt(email)}</p>
+      ${phoneRow}
+      ${linkedinRow}
+      ${portfolioRow}
+      ${coverRow}
+    </div>`.trim()
+}
+
+/** Best-effort email notification — caller decides whether failures matter. */
+async function sendApplicationEmail(fields) {
+  const host = process.env.SMTP_HOST
+  const user = process.env.SMTP_USER
+  const pass = process.env.SMTP_PASS
+  if (!host || !user || !pass) return
+
+  const port = Number(process.env.SMTP_PORT || 587)
+  const toEmail = process.env.CONTACT_TO_EMAIL || 'info@jashom.com'
+  const fromEmail = process.env.SMTP_FROM_EMAIL || user
+  const fromName = process.env.SMTP_FROM_NAME || 'Jashom Careers'
+  const transporter = nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } })
+  const subject = `New Job Application: ${fields.jobTitle || 'General'} — ${fields.fullName}`
+  const html = buildApplicationEmailHtml(fields)
+
+  await transporter.sendMail({ from: `"${fromName}" <${fromEmail}>`, to: toEmail, subject, html, replyTo: fields.email })
+}
+
 /** POST /v1/applications — submit job application (public) */
 router.post('/', async (req, res) => {
   try {
-    const body = req.body || {}
-    const fullName    = cleanText(body.fullName, 120)
-    const email       = cleanText(body.email, 254)
-    const phone       = cleanText(body.phone, 40)
-    const coverLetter = cleanText(body.coverLetter, 5000)
-    const linkedinUrl = cleanText(body.linkedinUrl, 500)
-    const portfolioUrl= cleanText(body.portfolioUrl, 500)
-    const jobId       = body.jobId ? Number(body.jobId) : null
-    const jobTitle    = cleanText(body.jobTitle, 255)
+    const fields = parseApplicationInput(req.body || {})
+    const validationError = validateApplicationInput(fields)
+    if (validationError) return res.status(400).json({ error: validationError })
 
-    if (!fullName) return res.status(400).json({ error: 'Full name is required' })
-    if (!email || !isValidEmail(email)) return res.status(400).json({ error: 'Valid email is required' })
-
-    if (jobId) {
-      const jobCheck = await pool.query('SELECT id FROM jobs WHERE id = $1', [jobId])
-      if (jobCheck.rowCount === 0) {
-        return res.status(404).json({ error: 'This job posting is no longer available' })
-      }
+    if (!(await jobExists(fields.jobId))) {
+      return res.status(404).json({ error: 'This job posting is no longer available' })
     }
 
-    // Save to DB
-    let rows
+    let application
     try {
-      ;({ rows } = await pool.query(
-        `INSERT INTO job_applications
-           (job_id, job_title, full_name, email, phone, cover_letter, linkedin_url, portfolio_url)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-        [jobId, jobTitle || null, fullName, email, phone || null, coverLetter || null, linkedinUrl || null, portfolioUrl || null]
-      ))
+      application = await insertApplication(fields)
     } catch (err) {
       if (err.code === '23503') {
         return res.status(404).json({ error: 'This job posting is no longer available' })
@@ -60,39 +120,13 @@ router.post('/', async (req, res) => {
       throw err
     }
 
-    // Send email notification (best-effort — don't fail the request if email fails)
     try {
-      const host = process.env.SMTP_HOST
-      const port = Number(process.env.SMTP_PORT || 587)
-      const user = process.env.SMTP_USER
-      const pass = process.env.SMTP_PASS
-      const toEmail = process.env.CONTACT_TO_EMAIL || 'info@jashom.com'
-
-      if (host && user && pass) {
-        const fromEmail = process.env.SMTP_FROM_EMAIL || user
-        const fromName  = process.env.SMTP_FROM_NAME  || 'Jashom Careers'
-        const transporter = nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } })
-        const subject = `New Job Application: ${jobTitle || 'General'} — ${fullName}`
-        const html = `
-          <div style="font-family:system-ui,sans-serif;line-height:1.5;color:#111">
-            <h2 style="margin:0 0 16px">New Job Application</h2>
-            ${jobTitle ? `<p style="margin:0 0 6px"><b>Position:</b> ${escapeLt(jobTitle)}</p>` : ''}
-            <p style="margin:0 0 6px"><b>Name:</b> ${escapeLt(fullName)}</p>
-            <p style="margin:0 0 6px"><b>Email:</b> ${escapeLt(email)}</p>
-            ${phone ? `<p style="margin:0 0 6px"><b>Phone:</b> ${escapeLt(phone)}</p>` : ''}
-            ${linkedinUrl ? `<p style="margin:0 0 6px"><b>LinkedIn:</b> ${escapeLt(linkedinUrl)}</p>` : ''}
-            ${portfolioUrl ? `<p style="margin:0 0 6px"><b>Portfolio:</b> ${escapeLt(portfolioUrl)}</p>` : ''}
-            ${coverLetter ? `<p style="margin:16px 0 6px"><b>Cover Letter:</b></p>
-            <pre style="margin:0;padding:12px;background:#f6f7f8;white-space:pre-wrap">${escapeLt(coverLetter)}</pre>` : ''}
-          </div>`.trim()
-
-        await transporter.sendMail({ from: `"${fromName}" <${fromEmail}>`, to: toEmail, subject, html, replyTo: email })
-      }
+      await sendApplicationEmail(fields)
     } catch (emailErr) {
       console.warn('application email failed (non-fatal):', emailErr.message)
     }
 
-    res.status(201).json({ ok: true, id: rows[0].id })
+    res.status(201).json({ ok: true, id: application.id })
   } catch (err) {
     console.error('POST /v1/applications', err)
     res.status(500).json({ error: err.message })
@@ -102,20 +136,17 @@ router.post('/', async (req, res) => {
 /** GET /v1/applications — list all applications (admin only, ?job_id=X&status=new) */
 router.get('/', requireAuth, async (req, res) => {
   try {
-    const { job_id, status, limit = 100, offset = 0 } = req.query
-    let query = `
-      SELECT a.*, j.title as job_title_live
-      FROM job_applications a
-      LEFT JOIN jobs j ON j.id = a.job_id
-      WHERE 1=1`
-    const params = []
-    let i = 1
-    if (job_id) { query += ` AND a.job_id = $${i++}`; params.push(job_id) }
-    if (status) { query += ` AND a.status = $${i++}`; params.push(status) }
-    query += ' ORDER BY a.applied_at DESC'
-    query += ` LIMIT $${i} OFFSET $${i + 1}`
-    params.push(Math.min(Number(limit) || 100, 500), Number(offset) || 0)
-    const { rows } = await pool.query(query, params)
+    const { job_id, status, limit, offset } = req.query
+    const { rows } = await queryPaginatedList({
+      baseQuery: `
+        SELECT a.*, j.title as job_title_live
+        FROM job_applications a
+        LEFT JOIN jobs j ON j.id = a.job_id
+        WHERE 1=1`,
+      filters: [['a.job_id', job_id], ['a.status', status]],
+      orderBy: 'ORDER BY a.applied_at DESC',
+      limit, offset, defaultLimit: 100, maxLimit: 500,
+    })
     res.json(rows)
   } catch (err) {
     res.status(500).json({ error: err.message })
