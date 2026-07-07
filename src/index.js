@@ -4,6 +4,8 @@ import { pool } from './db.js'
 import blogRoutes from './routes/blogs.js'
 import authRoutes from './routes/auth.js'
 import contactRoutes from './routes/contact.js'
+import jobRoutes from './routes/jobs.js'
+import applicationRoutes from './routes/applications.js'
 import { env } from './config.js'
 
 const app = express()
@@ -43,6 +45,8 @@ app.get('/health', async (_, res) => {
 
 app.use('/v1/admin/auth', authRoutes)
 app.use('/v1/admin/blogs', blogRoutes)
+app.use('/v1/admin/jobs', jobRoutes)
+app.use('/v1/applications', applicationRoutes)
 app.use('/v1/contact', contactRoutes)
 
 app.listen(env.port, () => {
