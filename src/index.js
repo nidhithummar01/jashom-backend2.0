@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js'
 import contactRoutes from './routes/contact.js'
 import jobRoutes from './routes/jobs.js'
 import applicationRoutes from './routes/applications.js'
+import authorRoutes from './routes/authors.js'
 import { env } from './config.js'
 
 const app = express()
@@ -48,6 +49,7 @@ app.use('/v1/admin/blogs', blogRoutes)
 app.use('/v1/admin/jobs', jobRoutes)
 app.use('/v1/applications', applicationRoutes)
 app.use('/v1/contact', contactRoutes)
+app.use('/v1/authors', authorRoutes)
 
 app.listen(env.port, () => {
   console.log(`Jashom backend running on http://localhost:${env.port}`)
