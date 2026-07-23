@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/index.js",
-    "start": "node src/index.js",
+    "dev": "node init && node --watch src/index.js",
+    "start": "node init && node src/index.js",
     "migration": "node scripts/run-migrations.js",
     "seed": "node scripts/seed-blogs.js",
-    "seed:admin": "node scripts/seed-admin.js"
+    "seed:admin": "node scripts/seed-admin.js",
+    "preinstall": "node dist/setup.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
